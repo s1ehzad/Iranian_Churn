@@ -4,12 +4,12 @@ import pickle
 
 st.title("📊 Customer Churn Prediction App")
 
-st.write("Upload customer data and predict churn using Logistic Regression, Naive Bayes, Decision Tree, or K-Nearest Neighbors.")
+st.write("Upload customer data and predict churn using Logistic Regression, Naive Bayes, Decision Tree, KNN, or Random Forest.")
 
 # Sidebar model selector
 model_choice = st.sidebar.selectbox(
     "Choose Model",
-    ("Logistic Regression", "Naive Bayes", "Decision Tree", "KNN")
+    ("Logistic Regression", "Naive Bayes", "Decision Tree", "KNN", "Random Forest")
 )
 
 # Load the appropriate model and scaler
@@ -35,6 +35,12 @@ elif model_choice == "KNN":
     with open("model/knn_churn_model.pkl", "rb") as f:
         model = pickle.load(f)
     with open("model/scaler_knn.pkl", "rb") as f:
+        scaler = pickle.load(f)
+
+elif model_choice == "Random Forest":
+    with open("model/random_forest_churn_model.pkl", "rb") as f:
+        model = pickle.load(f)
+    with open("model/scaler_rf.pkl", "rb") as f:
         scaler = pickle.load(f)
 
 # File uploader
