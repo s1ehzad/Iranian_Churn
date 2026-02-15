@@ -1,83 +1,70 @@
-import streamlit as st
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
+from sklearn.metrics import (
+    accuracy_score, roc_auc_score, precision_score,
+    recall_score, f1_score, matthews_corrcoef,
+    confusion_matrix, classification_report
+)
 import pickle
 
-st.title("📊 Customer Churn Prediction App")
+# Step 1: Load dataset
+df = pd.read_csv("customer churn.csv")  # <-- use your file name here
 
-st.write("Upload customer data and predict churn using Logistic Regression, Naive Bayes, Decision Tree, KNN, or Random Forest.")
+# Step 2: Features and target
+X = df.drop("Churn", axis=1)
+y = df["Churn"]
 
-# Sidebar model selector
-model_choice = st.sidebar.selectbox(
-    "Choose Model",
-    ("Logistic Regression", "Naive Bayes", "Decision Tree", "KNN", "Random Forest")
+# Step 3: Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# Load the appropriate model and scaler
-if model_choice == "Logistic Regression":
-    with open("model/logistic_churn_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    with open("model/scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
+# Step 4: Scale features (optional for tree-based models, but keeps consistency)
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-elif model_choice == "Naive Bayes":
-    with open("model/naive_bayes_churn_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    with open("model/scaler_nb.pkl", "rb") as f:
-        scaler = pickle.load(f)
+# Step 5: Train XGBoost Classifier
+xgb_model = XGBClassifier(
+    n_estimators=200,
+    learning_rate=0.1,
+    max_depth=5,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    random_state=42,
+    use_label_encoder=False,
+    eval_metric="logloss"
+)
+xgb_model.fit(X_train_scaled, y_train)
 
-elif model_choice == "Decision Tree":
-    with open("model/decision_tree_churn_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    with open("model/scaler_dt.pkl", "rb") as f:
-        scaler = pickle.load(f)
+# Step 6: Predictions
+y_pred = xgb_model.predict(X_test_scaled)
+y_proba = xgb_model.predict_proba(X_test_scaled)[:, 1]
 
-elif model_choice == "KNN":
-    with open("model/knn_churn_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    with open("model/scaler_knn.pkl", "rb") as f:
-        scaler = pickle.load(f)
+# Step 7: Metrics
+accuracy = accuracy_score(y_test, y_pred)
+auc = roc_auc_score(y_test, y_proba)
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
+mcc = matthews_corrcoef(y_test, y_pred)
 
-elif model_choice == "Random Forest":
-    with open("model/random_forest_churn_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    with open("model/scaler_rf.pkl", "rb") as f:
-        scaler = pickle.load(f)
+print("Accuracy:", accuracy)
+print("AUC Score:", auc)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+print("Matthews Correlation Coefficient:", mcc)
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
 
-# File uploader
-uploaded_file = st.file_uploader("Upload a CSV file with customer data", type=["csv"])
+# Step 8: Save model and scaler
+with open("xgboost_churn_model.pkl", "wb") as f:
+    pickle.dump(xgb_model, f)
 
-if uploaded_file is not None:
-    # Read uploaded data
-    data = pd.read_csv(uploaded_file)
+with open("scaler_xgb.pkl", "wb") as f:
+    pickle.dump(scaler, f)
 
-    st.write("### Preview of Uploaded Data")
-    st.write(data.head())
-
-    # Drop target column if present
-    if "Churn" in data.columns:
-        data = data.drop("Churn", axis=1)
-
-    # Scale features
-    X_scaled = scaler.transform(data)
-
-    # Predict churn
-    predictions = model.predict(X_scaled)
-    probabilities = model.predict_proba(X_scaled)[:, 1]
-
-    # Show results
-    results = pd.DataFrame({
-        "Churn Prediction": predictions,
-        "Churn Probability": probabilities
-    })
-
-    st.write("### Prediction Results")
-    st.write(results)
-
-    # Download option
-    csv = results.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="Download Predictions as CSV",
-        data=csv,
-        file_name=f"churn_predictions_{model_choice.replace(' ', '_').lower()}.csv",
-        mime="text/csv",
-    )
+print("✅ XGBoost model and scaler saved as pickle files.")
